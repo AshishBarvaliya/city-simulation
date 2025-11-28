@@ -134,6 +134,32 @@ export class Car extends BaseEntity {
       this.add(rearGlass)
     }
 
+    // Interior Details (Left-Hand Drive)
+    // Driver is on the Left (+X in local space if facing +Z)
+    
+    // Steering Wheel
+    const wheelColor = 0x111111
+    const steeringWheelGeo = new THREE.TorusGeometry(0.15, 0.02, 8, 16)
+    const steeringWheelMat = new THREE.MeshLambertMaterial({ color: wheelColor })
+    const steeringWheel = new THREE.Mesh(steeringWheelGeo, steeringWheelMat)
+    
+    // Position: Left side (+X), Front of cabin (+Z), slightly down
+    steeringWheel.position.set(0.45, cabinY - 0.1, cabinZ + cabinLength/2 - 0.4)
+    steeringWheel.rotation.x = -Math.PI / 4 // Angled towards driver
+    this.add(steeringWheel)
+    
+    // Driver Seat (Headrest/Back)
+    const seatGeo = new THREE.BoxGeometry(0.5, 0.6, 0.1)
+    const seatMat = new THREE.MeshLambertMaterial({ color: 0x333333 })
+    const driverSeat = new THREE.Mesh(seatGeo, seatMat)
+    driverSeat.position.set(0.45, cabinY - 0.1, cabinZ - 0.2)
+    this.add(driverSeat)
+    
+    // Passenger Seat
+    const passengerSeat = new THREE.Mesh(seatGeo, seatMat)
+    passengerSeat.position.set(-0.45, cabinY - 0.1, cabinZ - 0.2)
+    this.add(passengerSeat)
+
     // Wheels
     const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.3, 16)
     wheelGeo.rotateZ(Math.PI / 2)

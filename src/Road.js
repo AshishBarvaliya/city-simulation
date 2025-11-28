@@ -68,7 +68,10 @@ export class Road extends BaseEntity {
   }
 
   createIntersectionMarkings(size, yellowMat) {
-    // North-South yellow lines
+    // No yellow lines in the intersection box
+    
+    // North-South yellow lines (Removed)
+    /*
     const nsLineGeo = createPlane(0.3, size)
     const nsYellow1 = createMesh(nsLineGeo, yellowMat, false)
     nsYellow1.rotation.x = -Math.PI / 2
@@ -79,8 +82,10 @@ export class Road extends BaseEntity {
     nsYellow2.rotation.x = -Math.PI / 2
     nsYellow2.position.set(0.15, 0.01, 0)
     this.add(nsYellow2)
+    */
     
-    // East-West yellow lines
+    // East-West yellow lines (Removed)
+    /*
     const ewLineGeo = createPlane(size, 0.3)
     const ewYellow1 = createMesh(ewLineGeo, yellowMat, false)
     ewYellow1.rotation.x = -Math.PI / 2
@@ -91,6 +96,7 @@ export class Road extends BaseEntity {
     ewYellow2.rotation.x = -Math.PI / 2
     ewYellow2.position.set(0, 0.01, 0.15)
     this.add(ewYellow2)
+    */
   }
 
   createVerticalRoadMarkings(size, yellowMat, whiteMat, dashedMat, cfg) {
@@ -263,5 +269,170 @@ export class Road extends BaseEntity {
       bottomWalk.position.set(0, 0.2, roadWidth / 2 + 0.3 + parkwayWidth + sidewalkWidth / 2)
       this.add(bottomWalk)
     }
+  }
+
+  addApproachArrows(direction) {
+    // direction: The direction towards the intersection from this road segment.
+    // e.g. 'NORTH' means the intersection is to the North of this road.
+    
+    const roadWidth = CONFIG.city.roadWidth
+    const laneWidth = 3.75
+    const arrowSize = 2.0
+    
+    // Create materials
+    const straightLeftMat = this.createArrowMaterial('STRAIGHT_LEFT')
+    const straightRightMat = this.createArrowMaterial('STRAIGHT_RIGHT')
+    
+    const arrowGeo = createPlane(arrowSize, arrowSize * 2)
+    
+    // Determine positions based on direction
+    // We assume this road is adjacent to the intersection.
+    // We need to place arrows on the lanes that are heading TOWARDS the direction.
+    
+    let lanes = []
+    
+    if (direction === 'NORTH') {
+      // Intersection is North (-Z).
+      // Traffic heading North is on the Right side (East side, +X).
+      // Inner Lane (Left): x = +3.75/2 = +1.875
+      // Outer Lane (Right): x = +3.75 + 3.75/2 = +5.625
+      // Rotation: Facing North (-Z). Default plane is XY. Rotate X-90 -> XZ.
+      // Texture Up is -Z? We need to check texture orientation.
+      // Usually texture Y+ is "Up".
+      // If we map it to a plane on ground:
+      // We want "Up" to point North (-Z).
+      
+      lanes = [
+        { x: 1.875, z: -2, mat: straightLeftMat }, // Inner
+        { x: 5.625, z: -2, mat: straightRightMat }  // Outer
+      ]
+      
+      lanes.forEach(l => {
+        const mesh = createMesh(arrowGeo, l.mat, false, true)
+        mesh.rotation.x = -Math.PI / 2
+        mesh.rotation.z = 0 // Points North (-Z) if texture is standard
+        mesh.position.set(l.x, 0.02, l.z)
+        this.add(mesh)
+      })
+      
+    } else if (direction === 'SOUTH') {
+      // Intersection is South (+Z).
+      // Traffic heading South is on the Left side (West side, -X).
+      // Inner Lane: x = -1.875
+      // Outer Lane: x = -5.625
+      
+      lanes = [
+        { x: -1.875, z: 2, mat: straightLeftMat }, // Inner
+        { x: -5.625, z: 2, mat: straightRightMat }  // Outer
+      ]
+      
+      lanes.forEach(l => {
+        const mesh = createMesh(arrowGeo, l.mat, false, true)
+        mesh.rotation.x = -Math.PI / 2
+        mesh.rotation.z = Math.PI // Points South (+Z)
+        mesh.position.set(l.x, 0.02, l.z)
+        this.add(mesh)
+      })
+      
+    } else if (direction === 'EAST') {
+      // Intersection is East (+X).
+      // Traffic heading East is on the South side (+Z).
+      // Inner Lane: z = +1.875
+      // Outer Lane: z = +5.625
+      
+      lanes = [
+        { x: 2, z: 1.875, mat: straightLeftMat }, // Inner
+        { x: 2, z: 5.625, mat: straightRightMat }  // Outer
+      ]
+      
+      lanes.forEach(l => {
+        const mesh = createMesh(arrowGeo, l.mat, false, true)
+        mesh.rotation.x = -Math.PI / 2
+        mesh.rotation.z = -Math.PI / 2 // Points East (+X)
+        mesh.position.set(l.x, 0.02, l.z)
+        this.add(mesh)
+      })
+      
+    } else if (direction === 'WEST') {
+      // Intersection is West (-X).
+      // Traffic heading West is on the North side (-Z).
+      // Inner Lane: z = -1.875
+      // Outer Lane: z = -5.625
+      
+      lanes = [
+        { x: -2, z: -1.875, mat: straightLeftMat }, // Inner
+        { x: -2, z: -5.625, mat: straightRightMat }  // Outer
+      ]
+      
+      lanes.forEach(l => {
+        const mesh = createMesh(arrowGeo, l.mat, false, true)
+        mesh.rotation.x = -Math.PI / 2
+        mesh.rotation.z = Math.PI / 2 // Points West (-X)
+        mesh.position.set(l.x, 0.02, l.z)
+        this.add(mesh)
+      })
+    }
+  }
+
+  createArrowMaterial(type) {
+    const canvas = document.createElement('canvas')
+    canvas.width = 128
+    canvas.height = 256
+    const ctx = canvas.getContext('2d')
+    
+    // Clear
+    ctx.clearRect(0, 0, 128, 256)
+    
+    // Draw Arrow
+    ctx.fillStyle = '#ffffff'
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 10
+    
+    const cx = 64
+    const cy = 128
+    
+    // Stem
+    ctx.beginPath()
+    ctx.moveTo(cx, 240)
+    ctx.lineTo(cx, 80)
+    ctx.stroke()
+    
+    // Arrowhead (Straight)
+    ctx.beginPath()
+    ctx.moveTo(cx, 80)
+    ctx.lineTo(cx - 30, 110)
+    ctx.lineTo(cx + 30, 110)
+    ctx.fill()
+    
+    if (type === 'STRAIGHT_LEFT') {
+      // Left Turn Branch
+      ctx.beginPath()
+      ctx.moveTo(cx, 160)
+      ctx.quadraticCurveTo(cx, 120, 20, 120) // Curve to left
+      ctx.stroke()
+      
+      // Left Arrowhead
+      ctx.beginPath()
+      ctx.moveTo(20, 120)
+      ctx.lineTo(40, 100)
+      ctx.lineTo(40, 140)
+      ctx.fill()
+    } else if (type === 'STRAIGHT_RIGHT') {
+      // Right Turn Branch
+      ctx.beginPath()
+      ctx.moveTo(cx, 160)
+      ctx.quadraticCurveTo(cx, 120, 108, 120) // Curve to right
+      ctx.stroke()
+      
+      // Right Arrowhead
+      ctx.beginPath()
+      ctx.moveTo(108, 120)
+      ctx.lineTo(88, 100)
+      ctx.lineTo(88, 140)
+      ctx.fill()
+    }
+    
+    const tex = new THREE.CanvasTexture(canvas)
+    return createBasicMaterial(0xffffff, { map: tex, transparent: true })
   }
 }

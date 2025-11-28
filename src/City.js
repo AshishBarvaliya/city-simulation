@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { CONFIG } from './config/config.js'
+import { WorldGrid } from './managers/WorldGrid.js'
 import { EntityManager } from './managers/EntityManager.js'
 import { CityGenerator } from './managers/CityGenerator.js'
 import { SpawnManager } from './managers/SpawnManager.js'
@@ -12,9 +13,10 @@ export class City extends THREE.Group {
     this.size = size
     
     // Initialize managers
+    this.worldGrid = new WorldGrid(size, CONFIG.city.cellSize)
     this.entityManager = new EntityManager()
     this.spawnManager = new SpawnManager(this.entityManager, this)
-    this.generator = new CityGenerator(this, this.entityManager, this.spawnManager)
+    this.generator = new CityGenerator(this, this.entityManager, this.worldGrid, this.spawnManager)
     this.trafficSystem = new TrafficSystem(this.entityManager)
     
     // Generate the city
@@ -24,6 +26,9 @@ export class City extends THREE.Group {
   generateCity() {
     // Generate city layout (buildings, roads, decorations)
     const grid = this.generator.generateCity(this.size)
+    
+    // Pass traffic controllers to traffic system
+    this.trafficSystem.setTrafficControllers(this.generator.getTrafficControllers())
     
     // Spawn dynamic entities
     const cellSize = CONFIG.city.cellSize

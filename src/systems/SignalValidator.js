@@ -86,7 +86,17 @@ export class SignalValidator {
    * Validate signal is at correct elevation
    */
   validateElevation(trafficLight) {
-    const signalElevation = trafficLight.signalBox.getWorldPosition(new THREE.Vector3()).y
+    const signalBox = trafficLight.mastSignal || trafficLight.signalBox
+    if (!signalBox) {
+      return {
+        valid: false,
+        elevation: 'N/A',
+        range: 'N/A',
+        error: 'Could not find signal box for elevation check'
+      }
+    }
+    
+    const signalElevation = signalBox.getWorldPosition(new THREE.Vector3()).y
     
     const valid = signalElevation >= VALIDATION.MIN_SIGNAL_ELEVATION && 
                   signalElevation <= VALIDATION.MAX_SIGNAL_ELEVATION

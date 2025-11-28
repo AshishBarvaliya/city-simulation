@@ -13,35 +13,39 @@ import { randomInt } from '../utils/MathUtils.js'
 import { createPlane, createCylinder, createSphere, createMesh, createLambertMaterial, createBasicMaterial } from '../utils/GeometryFactory.js'
 import { SignalValidator } from '../systems/SignalValidator.js'
 import { IntersectionConfig } from '../data/IntersectionConfig.js'
+import { TrafficLightController } from '../systems/TrafficLightController.js'
 
 export class CityGenerator {
-  constructor(cityGroup, entityManager, spawnManager = null) {
+  constructor(cityGroup, entityManager, worldGrid, spawnManager = null) {
     this.cityGroup = cityGroup
     this.entityManager = entityManager
+    this.worldGrid = worldGrid
     this.spawnManager = spawnManager
     this.signalValidator = new SignalValidator()
     this.intersectionConfigs = []
     this.intersectionCount = 0
+    this.trafficControllers = [] // Store controllers for each intersection
   }
 
   /**
    * Generate the entire city
    */
   generateCity(size) {
-    const grid = this.createGrid(size)
+    this.gridSize = size
+    this.grid = this.createGrid(size)
     const cellSize = CONFIG.city.cellSize
     
     // Generate buildings and roads
     for (let x = 0; x < size; x++) {
       for (let z = 0; z < size; z++) {
-        const type = grid[x][z]
+        const type = this.grid[x][z]
         const posX = (x - size / 2) * cellSize
         const posZ = (z - size / 2) * cellSize
         
         if (type === 'BUILDING') {
-          this.createBuildingCell(posX, posZ, cellSize)
+          this.createBuildingCell(x, z, posX, posZ, cellSize)
         } else if (type === 'ROAD') {
-          this.createRoadCell(x, z, grid, size, posX, posZ, cellSize)
+          this.createRoadCell(x, z, this.grid, size, posX, posZ, cellSize)
         }
       }
     }
@@ -49,10 +53,97 @@ export class CityGenerator {
     // Add ground plane
     this.createGroundPlane(size, cellSize)
     
+    // Prune traffic lights that face buildings
+    this.pruneInvalidTrafficLights()
+    
+    // Add intersection approach markings (Arrows)
+    this.addIntersectionApproachMarkings()
+    
     // Print validation report
     this.printReport()
     
-    return grid
+    return this.grid
+  }
+
+  /**
+   * Remove traffic lights that are facing buildings or obstructions
+   */
+  pruneInvalidTrafficLights() {
+    if (!this.worldGrid) return
+
+    const lights = this.entityManager.getByType('TRAFFIC_LIGHT')
+    const toRemove = []
+
+    lights.forEach(light => {
+      // Get facing direction
+      const direction = light.getForwardVector() // Vector3
+      if (!direction) return
+
+      // Check a point in front of the light (e.g., 1 cell away)
+      const checkDist = CONFIG.city.cellSize
+      const checkPos = light.position.clone().add(direction.clone().multiplyScalar(checkDist))
+      
+      // Check what's at that position
+      const cell = this.worldGrid.getCellFromWorldPos(checkPos.x, checkPos.z)
+      
+      if (cell && cell.type === 'BUILDING') {
+        console.log(`⚠️ DETECTED invalid traffic light at (${light.position.x.toFixed(1)}, ${light.position.z.toFixed(1)}) facing building`)
+        console.log(`   Facing: ${direction.x.toFixed(1)}, ${direction.z.toFixed(1)}`)
+        console.log(`   Check Pos: ${checkPos.x.toFixed(1)}, ${checkPos.z.toFixed(1)}`)
+        // toRemove.push(light) // DISABLED PRUNING FOR DEBUGGING
+      }
+    })
+
+    // Remove invalid lights
+    toRemove.forEach(light => {
+      this.cityGroup.remove(light)
+      this.entityManager.remove(light)
+      
+      // Also remove from intersection config if needed
+      // This is a bit tricky since we don't have a direct link back to the config here
+      // But for visual purposes, this is sufficient.
+    })
+    
+    if (toRemove.length > 0) {
+      console.log(`🧹 Pruned ${toRemove.length} invalid traffic lights.`)
+    }
+  }
+
+  /**
+   * Add approach arrow markings to roads near intersections
+   */
+  addIntersectionApproachMarkings() {
+    // Iterate through all cells to find intersections
+    for (let x = 0; x < this.gridSize; x++) {
+      for (let z = 0; z < this.gridSize; z++) {
+        const cell = this.grid[x][z]
+        if (cell && cell.type === 'INTERSECTION') {
+          // Check neighbors for roads
+          const neighbors = [
+            { dx: 0, dz: -1, dir: 'SOUTH' }, // North neighbor approaches from South
+            { dx: 0, dz: 1, dir: 'NORTH' },  // South neighbor approaches from North
+            { dx: -1, dz: 0, dir: 'EAST' },  // West neighbor approaches from East
+            { dx: 1, dz: 0, dir: 'WEST' }    // East neighbor approaches from West
+          ]
+          
+          neighbors.forEach(n => {
+            const nx = x + n.dx
+            const nz = z + n.dz
+            
+            if (nx >= 0 && nx < this.gridSize && nz >= 0 && nz < this.gridSize) {
+              const neighborCell = this.grid[nx][nz]
+              if (neighborCell && neighborCell.type === 'ROAD' && neighborCell.entity) {
+                if (neighborCell.entity.addApproachArrows) {
+                  neighborCell.entity.addApproachArrows(n.dir)
+                }
+              }
+            }
+          })
+        }
+      }
+    }
+    
+    console.log(`🎯 Added approach arrow markings to roads`)
   }
 
   /**
@@ -78,7 +169,7 @@ export class CityGenerator {
   /**
    * Create a building cell with lawn and trees
    */
-  createBuildingCell(x, z, cellSize) {
+  createBuildingCell(gridX, gridZ, x, z, cellSize) {
     const building = new Building()
     building.position.set(x, 0, z)
     this.cityGroup.add(building)
@@ -87,6 +178,15 @@ export class CityGenerator {
     // Register building position with spawn manager for collision detection
     if (this.spawnManager) {
       this.spawnManager.registerBuilding(building)
+    }
+
+    // Update world matrix to ensure correct bounds calculation
+    building.updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(building)
+    
+    // Register in WorldGrid
+    if (this.worldGrid) {
+      this.worldGrid.register(gridX, gridZ, 'BUILDING', building, box)
     }
     
     // Add lawn
@@ -112,6 +212,15 @@ export class CityGenerator {
     road.position.set(posX, 0.05, posZ)
     this.cityGroup.add(road)
     this.entityManager.add(road)
+
+    // Update world matrix
+    road.updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(road)
+
+    // Register in WorldGrid
+    if (this.worldGrid) {
+      this.worldGrid.register(x, z, 'ROAD', road, box)
+    }
     
     // Add traffic lights and crosswalks at intersections
     if (x % 3 === 0 && z % 3 === 0) {
@@ -132,15 +241,27 @@ export class CityGenerator {
     
     // Add 4 traffic lights (one at each corner)
     const corners = [CORNERS.NE, CORNERS.NW, CORNERS.SE, CORNERS.SW]
+    const lights = {}
     
     corners.forEach((corner) => {
       const light = new TrafficLight(corner)
       light.position.x += x
       light.position.z += z
+      light.externalControl = true // Enable external control
       
       // Always add the traffic light (validation is optional)
       this.cityGroup.add(light)
       this.entityManager.add(light)
+      
+      // Store light reference by direction
+      // NE pole primary faces South (controls Northbound)
+      // NW pole primary faces East (controls Westbound)
+      // SE pole primary faces West (controls Eastbound)
+      // SW pole primary faces North (controls Southbound)
+      if (corner === CORNERS.NE) lights.north = light
+      if (corner === CORNERS.NW) lights.west = light
+      if (corner === CORNERS.SE) lights.east = light
+      if (corner === CORNERS.SW) lights.south = light
       
       // Validate signal for reporting purposes
       const validationResult = this.signalValidator.isValid(light, config)
@@ -164,6 +285,12 @@ export class CityGenerator {
         validationResult.valid
       )
     })
+    
+    // Create traffic light controller for this intersection
+    const controller = new TrafficLightController(config)
+    controller.setLights(lights.north, lights.south, lights.east, lights.west)
+    this.trafficControllers.push(controller)
+    this.entityManager.add(controller) // Add to entity manager for update loop
     
     // Store config
     this.intersectionConfigs.push(config)
@@ -312,5 +439,12 @@ export class CityGenerator {
    */
   getIntersectionData() {
     return this.intersectionConfigs.map(config => config.toJSON())
+  }
+
+  /**
+   * Get traffic controllers for all intersections
+   */
+  getTrafficControllers() {
+    return this.trafficControllers
   }
 }

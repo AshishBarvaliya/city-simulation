@@ -116,26 +116,40 @@ export class SpawnManager {
     const offsetAmount = useOuterLane ? 5.625 : 1.875
     
     if (orientation === 'HORIZONTAL') {
-      // East-West Road - car travels horizontally
+      // East-West Road
+      // US Driving Rule: Drive on the Right
+      
       if (worldX > 0) {
-        rotation = ROTATIONS.WEST // Traveling West (negative X)
-        laneOffset = -offsetAmount // Right side of road
+        rotation = ROTATIONS.WEST // Traveling West (-X)
+        // Right side of Westbound (-X) is North (+Z).
+        // So we need Positive Z.
+        laneOffset = offsetAmount 
       } else {
-        rotation = ROTATIONS.EAST // Traveling East (positive X)
-        laneOffset = offsetAmount // Right side of road
+        rotation = ROTATIONS.EAST // Traveling East (+X)
+        // Right side of Eastbound (+X) is South (-Z).
+        // So we need Negative Z.
+        laneOffset = -offsetAmount 
       }
       
       // Apply offset to Z (perpendicular to travel direction)
       return new Car(new THREE.Vector3(worldX, 0, worldZ + laneOffset), rotation)
       
     } else if (orientation === 'VERTICAL') {
-      // North-South Road - car travels vertically
+      // North-South Road
+      // US Driving Rule: Drive on the Right
+      
       if (worldZ > 0) {
-        rotation = ROTATIONS.SOUTH // Traveling South (positive Z)
-        laneOffset = -offsetAmount // Right side of road
+        rotation = ROTATIONS.SOUTH // Traveling South (+Z)
+        // Right side of Southbound (+Z) is West (+X). Wait.
+        // Forward: (0,0,1). Up: (0,1,0). Right: Cross(Up, Fwd) = (1,0,0) = +X.
+        // So we need Positive X.
+        laneOffset = offsetAmount 
       } else {
-        rotation = ROTATIONS.NORTH // Traveling North (negative Z)
-        laneOffset = offsetAmount // Right side of road
+        rotation = ROTATIONS.NORTH // Traveling North (-Z)
+        // Right side of Northbound (-Z) is East (-X). Wait.
+        // Forward: (0,0,-1). Up: (0,1,0). Right: Cross(Up, Fwd) = (-1,0,0) = -X.
+        // So we need Negative X.
+        laneOffset = -offsetAmount 
       }
       
       // Apply offset to X (perpendicular to travel direction)
