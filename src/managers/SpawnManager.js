@@ -65,18 +65,27 @@ export class SpawnManager {
         this.cityGroup.add(car)
         
         // Assign a path with a left turn for debugging
-        const startCell = this.worldGrid.getCellFromWorldPos(car.position.x, car.position.z)
-        if (startCell) {
-          // Find nearest intersection as starting point for pathfinding
-          const startIntersection = this.findNearestIntersection(startCell, grid)
+        // Convert world position to grid coordinates
+        const gridX = Math.round(car.position.x / cellSize + grid.length / 2)
+        const gridZ = Math.round(car.position.z / cellSize + grid.length / 2)
+        const startCell = { x: gridX, z: gridZ }
+        
+        // Find nearest intersection as starting point for pathfinding
+        const startIntersection = this.findNearestIntersection(startCell, grid)
+        if (startIntersection) {
           this.assignPathWithLeftTurn(car, startIntersection, grid, cellSize)
         }
         
         // Set callback for when car reaches destination
         car.onReachDestination = (reachedCar) => {
-          const currentCell = this.worldGrid.getCellFromWorldPos(reachedCar.position.x, reachedCar.position.z)
-          if (currentCell) {
-            this.assignPathWithLeftTurn(reachedCar, currentCell, this.grid, this.cellSize)
+          // Convert world position to grid coordinates
+          const gridX = Math.round(reachedCar.position.x / this.cellSize + this.grid.length / 2)
+          const gridZ = Math.round(reachedCar.position.z / this.cellSize + this.grid.length / 2)
+          const currentCell = { x: gridX, z: gridZ }
+          
+          const intersection = this.findNearestIntersection(currentCell, this.grid)
+          if (intersection) {
+            this.assignPathWithLeftTurn(reachedCar, intersection, this.grid, this.cellSize)
           }
         }
       }
