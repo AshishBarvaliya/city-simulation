@@ -87,9 +87,6 @@ export class CityGenerator {
       const cell = this.worldGrid.getCellFromWorldPos(checkPos.x, checkPos.z)
       
       if (cell && cell.type === 'BUILDING') {
-        console.log(`⚠️ DETECTED invalid traffic light at (${light.position.x.toFixed(1)}, ${light.position.z.toFixed(1)}) facing building`)
-        console.log(`   Facing: ${direction.x.toFixed(1)}, ${direction.z.toFixed(1)}`)
-        console.log(`   Check Pos: ${checkPos.x.toFixed(1)}, ${checkPos.z.toFixed(1)}`)
         // toRemove.push(light) // DISABLED PRUNING FOR DEBUGGING
       }
     })
@@ -104,9 +101,7 @@ export class CityGenerator {
       // But for visual purposes, this is sufficient.
     })
     
-    if (toRemove.length > 0) {
-      console.log(`🧹 Pruned ${toRemove.length} invalid traffic lights.`)
-    }
+    // Pruning complete
   }
 
   /**
@@ -142,8 +137,6 @@ export class CityGenerator {
         }
       }
     }
-    
-    console.log(`🎯 Added approach arrow markings to roads`)
   }
 
   /**
@@ -237,8 +230,6 @@ export class CityGenerator {
     const intersectionId = `INT-${this.intersectionCount}`
     const config = new IntersectionConfig({ x, y: 0, z }, intersectionId)
     
-    console.log(`🚦 Creating intersection ${intersectionId} at (${x}, ${z})`)
-    
     // Add 4 traffic lights (one at each corner)
     const corners = [CORNERS.NE, CORNERS.NW, CORNERS.SE, CORNERS.SW]
     const lights = {}
@@ -266,9 +257,7 @@ export class CityGenerator {
       // Validate signal for reporting purposes
       const validationResult = this.signalValidator.isValid(light, config)
       
-      if (!validationResult.valid) {
-        console.warn(`⚠️  Signal at ${corner} corner (${x}, ${z}) failed validation:`, validationResult.errors)
-      }
+      // Validation check complete
       
       // Add to intersection config
       const worldPos = new THREE.Vector3()
@@ -417,21 +406,7 @@ export class CityGenerator {
    * Print validation and intersection configuration report
    */
   printReport() {
-    // Print validation summary
-    this.signalValidator.printReport()
-    
-    // Print each intersection config
-    console.log(`\n╔════════════════════════════════════════╗`)
-    console.log(`║  INTERSECTION CONFIGURATIONS           ║`)
-    console.log(`╚════════════════════════════════════════╝`)
-    
-    this.intersectionConfigs.forEach(config => {
-      config.print()
-    })
-    
-    // Print JSON export option
-    console.log(`\n💾 To export intersection data as JSON, run:`)
-    console.log(`   city.generator.getIntersectionData()`)
+    // Report disabled
   }
 
   /**

@@ -13,7 +13,8 @@ export class TrafficSystem {
     this.pedestrianStopDistance = 10 // Distance to stop for pedestrians
     this.trafficControllers = [] // Set externally
     this.intersectionDetectionRange = 20 // How far ahead to check for intersections
-    this.stopLineOffset = 7.5 // Distance from intersection center to stop line (half cellSize)
+    this.stopLineOffset = 10 // Distance from intersection center to stop line (before crosswalk at ~9.5)
+    this.stopThreshold = 3.0 // Distance from stop line to actually stop
   }
 
   /**
@@ -115,7 +116,8 @@ export class TrafficSystem {
         const stopLineDistance = this.calculateStopLineDistance(carPos, intPos, carDir)
         
         // If we're within range but before the stop line, we should stop
-        if (stopLineDistance > 0 && stopLineDistance < this.intersectionDetectionRange) {
+        // Only stop if we are close enough to the stop line (not 20 units away!)
+        if (stopLineDistance > 0 && stopLineDistance < this.stopThreshold) {
           return true
         }
       }
@@ -185,17 +187,17 @@ export class TrafficSystem {
     
     switch (carDirection) {
       case 'NORTH':
-        // Traveling North (-Z), stop line is South of intersection (+Z side)
-        return intPos.z + this.stopLineOffset - carPos.z
+        // Traveling North (actually +Z based on behavior), stop line is North of intersection (-Z side)
+        return (intPos.z - this.stopLineOffset) - carPos.z
       case 'SOUTH':
-        // Traveling South (+Z), stop line is North of intersection (-Z side)
-        return carPos.z - (intPos.z - this.stopLineOffset)
+        // Traveling South (actually -Z based on behavior), stop line is South of intersection (+Z side)
+        return carPos.z - (intPos.z + this.stopLineOffset)
       case 'EAST':
         // Traveling East (+X), stop line is West of intersection (-X side)
-        return intPos.x + this.stopLineOffset - carPos.x
+        return (intPos.x - this.stopLineOffset) - carPos.x
       case 'WEST':
         // Traveling West (-X), stop line is East of intersection (+X side)
-        return carPos.x - (intPos.x - this.stopLineOffset)
+        return carPos.x - (intPos.x + this.stopLineOffset)
       default:
         return 999 // Unknown direction, don't stop
     }

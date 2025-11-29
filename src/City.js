@@ -5,6 +5,7 @@ import { EntityManager } from './managers/EntityManager.js'
 import { CityGenerator } from './managers/CityGenerator.js'
 import { SpawnManager } from './managers/SpawnManager.js'
 import { TrafficSystem } from './systems/TrafficSystem.js'
+import { CollisionSystem } from './systems/CollisionSystem.js'
 
 export class City extends THREE.Group {
   constructor(size = CONFIG.city.gridSize) {
@@ -15,9 +16,10 @@ export class City extends THREE.Group {
     // Initialize managers
     this.worldGrid = new WorldGrid(size, CONFIG.city.cellSize)
     this.entityManager = new EntityManager()
-    this.spawnManager = new SpawnManager(this.entityManager, this)
+    this.spawnManager = new SpawnManager(this.entityManager, this, this.worldGrid)
     this.generator = new CityGenerator(this, this.entityManager, this.worldGrid, this.spawnManager)
     this.trafficSystem = new TrafficSystem(this.entityManager)
+    this.collisionSystem = new CollisionSystem(this.entityManager)
     
     // Generate the city
     this.generateCity()
@@ -42,6 +44,7 @@ export class City extends THREE.Group {
   update(delta, time) {
     this.entityManager.update(delta, time)
     this.trafficSystem.update(delta)
+    this.collisionSystem.update(delta)
   }
 
   /**

@@ -155,29 +155,6 @@ export class SignalValidator {
    * Print validation report
    */
   printReport() {
-    console.log(`\n╔════════════════════════════════════════╗`)
-    console.log(`║  SIGNAL VALIDATION REPORT              ║`)
-    console.log(`╚════════════════════════════════════════╝`)
-    
-    const summary = this.getSummary()
-    console.log(`\n📊 Summary:`)
-    console.log(`   Total Signals: ${summary.total}`)
-    console.log(`   ✅ Valid: ${summary.valid}`)
-    console.log(`   ❌ Invalid: ${summary.invalid}`)
-    console.log(`   Validation Rate: ${summary.validationRate}`)
-    
-    const invalidSignals = this.validationResults.filter(r => !r.valid)
-    if (invalidSignals.length > 0) {
-      console.log(`\n⚠️  Invalid Signals:`)
-      invalidSignals.forEach((result, i) => {
-        console.log(`\n   ${i + 1}. Corner: ${result.corner}`)
-        result.errors.forEach(error => {
-          console.log(`      ❌ ${error}`)
-        })
-      })
-    } else {
-      console.log(`\n✅ All signals passed validation!`)
-    }
-    console.log(`\n${'─'.repeat(50)}\n`)
+    // Validation report disabled
   }
 }

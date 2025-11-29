@@ -42,6 +42,12 @@ controls.dampingFactor = 0.05
 controls.maxDistance = 150 // Limit zoom out distance
 controls.minDistance = 10 // Limit zoom in distance
 
+// Raycaster for car selection
+const raycaster = new THREE.Raycaster()
+const mouse = new THREE.Vector2()
+let selectedCar = null
+let isFollowMode = false
+
 // Lighting
 const ambientLight = new THREE.AmbientLight(
   CONFIG.lighting.ambient.color,
@@ -77,12 +83,104 @@ function animate() {
   const time = clock.getElapsedTime()
 
   city.update(delta, time)
-  controls.update()
+  
+  // Update camera if in follow mode
+  if (isFollowMode && selectedCar && selectedCar.active) {
+    updateFollowCamera()
+  } else {
+    controls.update()
+  }
   
   renderer.render(scene, camera)
 }
 
 animate()
+
+// Camera follow logic
+function updateFollowCamera() {
+  if (!selectedCar || !selectedCar.active) {
+    exitFollowMode()
+    return
+  }
+  
+  // Get car's position and forward direction
+  const carPos = selectedCar.position.clone()
+  const carForward = selectedCar.getForwardVector()
+  
+  // Camera offset: behind and above the car
+  const cameraDistance = 8 // Distance behind car
+  const cameraHeight = 4 // Height above car
+  
+  // Position camera behind the car
+  const cameraOffset = carForward.clone().multiplyScalar(-cameraDistance)
+  cameraOffset.y = cameraHeight
+  
+  const targetCameraPos = carPos.clone().add(cameraOffset)
+  
+  // Smooth camera movement (lerp)
+  camera.position.lerp(targetCameraPos, 0.1)
+  
+  // Look at a point slightly ahead of the car
+  const lookAtPoint = carPos.clone().add(carForward.multiplyScalar(5))
+  lookAtPoint.y += 1
+  
+  camera.lookAt(lookAtPoint)
+}
+
+function exitFollowMode() {
+  isFollowMode = false
+  selectedCar = null
+  controls.enabled = true
+}
+
+// Mouse click handler for car selection
+function onMouseClick(event) {
+  // Calculate mouse position in normalized device coordinates
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
+  
+  // Update the raycaster
+  raycaster.setFromCamera(mouse, camera)
+  
+  // Get all cars
+  const cars = city.entityManager.getByType('CAR')
+  const carMeshes = cars.filter(c => c.active).map(c => c.children).flat()
+  
+  // Check for intersections
+  const intersects = raycaster.intersectObjects(carMeshes, true)
+  
+  if (intersects.length > 0) {
+    // Find the car object (parent of the mesh)
+    let clickedCar = intersects[0].object
+    while (clickedCar.parent && clickedCar.parent.type !== 'Scene' && !clickedCar.parent.isCity) {
+      clickedCar = clickedCar.parent
+      if (clickedCar.type === 'CAR' || cars.includes(clickedCar)) {
+        selectedCar = clickedCar
+        isFollowMode = true
+        controls.enabled = false
+        console.log('Following car:', selectedCar)
+        return
+      }
+    }
+  } else {
+    // Clicked on empty space, exit follow mode
+    if (isFollowMode) {
+      exitFollowMode()
+    }
+  }
+}
+
+// Keyboard handler for exiting follow mode
+function onKeyDown(event) {
+  if (event.key === 'Escape' && isFollowMode) {
+    exitFollowMode()
+    console.log('Exited follow mode')
+  }
+}
+
+// Event listeners
+window.addEventListener('click', onMouseClick)
+window.addEventListener('keydown', onKeyDown)
 
 // Resize Handler
 window.addEventListener('resize', () => {

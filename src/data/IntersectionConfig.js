@@ -87,27 +87,6 @@ export class IntersectionConfig {
   }
 
   print() {
-    console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
-    console.log(`📍 Intersection ${this.intersectionId}`)
-    console.log(`Position: (${this.position.x}, ${this.position.z})`)
-    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
-    
-    console.log(`\n🚦 Traffic Signals (${this.signals.length}):`)
-    this.signals.forEach((signal, i) => {
-      const status = signal.validated ? '✅' : '❌'
-      console.log(`  ${i + 1}. ${status} Corner: ${signal.corner} | Controls: ${signal.controlsLane}`)
-      console.log(`     Faces: ${signal.facingDirection} | Rotation: ${(signal.rotation.y * 180 / Math.PI).toFixed(1)}°`)
-      console.log(`     Position: (${signal.position.x.toFixed(1)}, ${signal.position.z.toFixed(1)})`)
-    })
-    
-    console.log(`\n🚶 Pedestrian Signals (${this.pedestrianSignals.length}):`)
-    this.pedestrianSignals.forEach((signal, i) => {
-      console.log(`  ${i + 1}. Corner: ${signal.corner} | Faces: ${signal.facingDirection}`)
-    })
-    
-    console.log(`\n⏱️  Timing Plan:`)
-    console.log(`  Red: ${this.timingPlan.redDuration}s | Yellow: ${this.timingPlan.yellowDuration}s | Green: ${this.timingPlan.greenDuration}s`)
-    console.log(`  Total Cycle: ${this.timingPlan.cycleTime}s`)
-    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`)
+    // Print disabled
   }
 }
