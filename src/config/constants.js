@@ -70,11 +70,13 @@ export const CELL_TYPES = {
 }
 
 // Rotation Values (in radians)
+// Rotation Values (in radians)
+// Car model faces +Z (South) by default
 export const ROTATIONS = {
-  NORTH: 0,
-  EAST: -Math.PI / 2,
-  SOUTH: Math.PI,
-  WEST: Math.PI / 2,
+  NORTH: Math.PI,      // Rotate 180 to face -Z
+  EAST: Math.PI / 2,   // Rotate 90 to face +X
+  SOUTH: 0,            // No rotation to face +Z
+  WEST: -Math.PI / 2,  // Rotate -90 to face -X
 }
 
 // Traffic Approaches (Corner to Lane Control Mapping)

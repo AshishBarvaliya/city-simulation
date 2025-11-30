@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { City } from './src/City.js'
 import { CONFIG } from './src/config/config.js'
+import { UIManager } from './src/managers/UIManager.js'
 
 // Scene Setup
 const scene = new THREE.Scene()
@@ -14,8 +15,6 @@ if (CONFIG.scene.fogEnabled) {
     CONFIG.scene.fogFar
   )
 }
-
-
 
 const camera = new THREE.PerspectiveCamera(
   75,
@@ -47,6 +46,9 @@ const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
 let selectedCar = null
 let isFollowMode = false
+
+// UI Manager
+const uiManager = new UIManager()
 
 // Lighting
 const ambientLight = new THREE.AmbientLight(
@@ -87,8 +89,14 @@ function animate() {
   // Update camera if in follow mode
   if (isFollowMode && selectedCar && selectedCar.active) {
     updateFollowCamera()
+    
+    // Update UI
+    uiManager.show()
+    const nextTurn = selectedCar.getNextTurnDirection()
+    uiManager.setDirection(nextTurn)
   } else {
     controls.update()
+    uiManager.hide()
   }
   
   renderer.render(scene, camera)
@@ -131,6 +139,7 @@ function exitFollowMode() {
   isFollowMode = false
   selectedCar = null
   controls.enabled = true
+  uiManager.hide()
 }
 
 // Mouse click handler for car selection

@@ -284,12 +284,61 @@ export class Car extends BaseEntity {
     if (this.path.length > 0 || this.targetNode) {
       this.followPath(delta)
     } else {
-      // Fallback if no path (shouldn't happen with new logic, but safe to keep)
-      this.moveForward(delta)
-      this.wrapPosition()
+      // Fallback if no path: Stop the car
+      // We don't want cars driving off the map or wrapping around
+      this.stop()
     }
     
     this.updateIndicators(delta)
+    
+    // Safety check for boundaries
+    this.checkBoundaries()
+  }
+
+  checkBoundaries() {
+    // Safety check: if car is too far out, force despawn
+    // maxBoundary is 112.5. Add buffer.
+    const limit = this.maxBoundary + 20 
+    if (Math.abs(this.position.x) > limit || Math.abs(this.position.z) > limit) {
+      // Only log occasionally or if needed
+      // console.warn(`Car out of bounds at (${this.position.x.toFixed(1)}, ${this.position.z.toFixed(1)}), forcing despawn`)
+      this.onDestinationReached(true) // Force despawn
+    }
+  }
+
+  /**
+   * Get the direction of the next turn
+   * Returns 'LEFT', 'RIGHT', or 'STRAIGHT'
+   */
+  getNextTurnDirection() {
+    // If already turning, use indicators
+    if (this.isTurning) {
+      if (this.indicators.left.active) return 'LEFT'
+      if (this.indicators.right.active) return 'RIGHT'
+      return 'STRAIGHT'
+    }
+    
+    // If no path or target, straight
+    if (!this.targetNode || !this.path || this.path.length === 0) return 'STRAIGHT'
+    
+    // Look ahead to the next node in the path
+    // this.targetNode is where we are going NOW
+    // this.path[0] is where we go AFTER targetNode
+    const nextNode = this.path[0]
+    
+    // Calculate direction from targetNode to nextNode
+    const dx = nextNode.x - this.targetNode.x
+    const dz = nextNode.z - this.targetNode.z
+    
+    let nextDir = null
+    if (Math.abs(dx) > Math.abs(dz)) {
+      nextDir = dx > 0 ? DIRECTIONS.EAST : DIRECTIONS.WEST
+    } else {
+      nextDir = dz > 0 ? DIRECTIONS.SOUTH : DIRECTIONS.NORTH
+    }
+    
+    // Compare current direction with next direction
+    return this.getTurnDirection(this.direction, nextDir)
   }
 
   setPath(path) {
@@ -525,7 +574,7 @@ export class Car extends BaseEntity {
     }
   }
 
-  onDestinationReached() {
+  onDestinationReached(forceDespawn = false) {
     // Request new path from SpawnManager
     // We don't have direct access to SpawnManager instance here.
     // But we can emit an event or call a method if we had the reference.
@@ -541,7 +590,7 @@ export class Car extends BaseEntity {
     // Or better: Pass a callback to the car when spawning?
     
     if (this.onReachDestination) {
-        this.onReachDestination(this)
+        this.onReachDestination(this, forceDespawn)
     } else {
         this.stop()
         // Fade out and remove?

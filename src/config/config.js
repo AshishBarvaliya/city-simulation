@@ -47,7 +47,7 @@ export const CONFIG = {
   // Car Settings
   car: {
     types: ['SEDAN', 'HATCHBACK', 'TRUCK'],
-    spawnCount: 60, // 10x more cars
+    spawnCount: 20, // Reduced from 60 for testing edge spawning
     minSpeed: 4,
     maxSpeed: 8,
     chassisHeight: 0.5,

@@ -49,7 +49,7 @@ export class SpawnManager {
    */
   spawnCars(grid, cellSize) {
     const cfg = CONFIG.car
-    const spawnCount = 1 // DEBUG: Only spawn 1 car
+    const spawnCount = cfg.spawnCount
     
     // Initialize pathfinder
     this.pathfinder = new Pathfinder(grid.length)
@@ -58,13 +58,17 @@ export class SpawnManager {
     this.grid = grid
     this.cellSize = cellSize
     
+    // Find all edge spawn points
+    this.edgeSpawnPoints = this.findEdgeSpawnPoints(grid)
+    
+    console.log(`Found ${this.edgeSpawnPoints.length} edge spawn points`)
+    
     for (let i = 0; i < spawnCount; i++) {
       const car = this.createCar(grid, cellSize)
       if (car) {
         this.entityManager.add(car)
         this.cityGroup.add(car)
         
-        // Assign a path with a left turn for debugging
         // Convert world position to grid coordinates
         const gridX = Math.round(car.position.x / cellSize + grid.length / 2)
         const gridZ = Math.round(car.position.z / cellSize + grid.length / 2)
@@ -73,19 +77,55 @@ export class SpawnManager {
         // Find nearest intersection as starting point for pathfinding
         const startIntersection = this.findNearestIntersection(startCell, grid)
         if (startIntersection) {
-          this.assignPathWithLeftTurn(car, startIntersection, grid, cellSize)
+          this.assignRandomPath(car, startIntersection, grid, cellSize)
         }
         
         // Set callback for when car reaches destination
-        car.onReachDestination = (reachedCar) => {
+        car.onReachDestination = (reachedCar, forceDespawn = false) => {
           // Convert world position to grid coordinates
           const gridX = Math.round(reachedCar.position.x / this.cellSize + this.grid.length / 2)
           const gridZ = Math.round(reachedCar.position.z / this.cellSize + this.grid.length / 2)
           const currentCell = { x: gridX, z: gridZ }
           
-          const intersection = this.findNearestIntersection(currentCell, this.grid)
-          if (intersection) {
-            this.assignPathWithLeftTurn(reachedCar, intersection, this.grid, this.cellSize)
+          // Check if car is at an edge intersection OR forced despawn
+          const isEdge = this.isEdgeIntersection(currentCell, this.grid)
+          // console.log(`Car reached destination at (${gridX}, ${gridZ}). Is edge? ${isEdge}`)
+          
+          if (isEdge || forceDespawn) {
+            // Despawn the car
+            if (forceDespawn) {
+              console.log('Car forced despawn (out of bounds)')
+            } else {
+              console.log('Car reached edge, despawning...')
+            }
+            
+            this.entityManager.remove(reachedCar)
+            this.cityGroup.remove(reachedCar)
+            
+            // Spawn a new car to maintain population
+            const newCar = this.createCar(this.grid, this.cellSize)
+            if (newCar) {
+              this.entityManager.add(newCar)
+              this.cityGroup.add(newCar)
+              
+              // Assign path to new car
+              const newGridX = Math.round(newCar.position.x / this.cellSize + this.grid.length / 2)
+              const newGridZ = Math.round(newCar.position.z / this.cellSize + this.grid.length / 2)
+              const newStartCell = { x: newGridX, z: newGridZ }
+              const newStartIntersection = this.findNearestIntersection(newStartCell, this.grid)
+              if (newStartIntersection) {
+                this.assignRandomPath(newCar, newStartIntersection, this.grid, this.cellSize)
+              }
+              
+              // Set the same callback for the new car
+              newCar.onReachDestination = car.onReachDestination
+            }
+          } else {
+            // Not at edge, assign new path
+            const intersection = this.findNearestIntersection(currentCell, this.grid)
+            if (intersection) {
+              this.assignRandomPath(reachedCar, intersection, this.grid, this.cellSize)
+            }
           }
         }
       }
@@ -93,55 +133,36 @@ export class SpawnManager {
   }
 
   /**
-   * Create a single car at a valid spawn position
+   * Create a single car at a valid edge spawn position
    */
   createCar(grid, cellSize) {
-    // Find road cells with their orientation
-    const roadCells = []
-    for (let x = 0; x < grid.length; x++) {
-      for (let z = 0; z < grid[x].length; z++) {
-        if (grid[x][z] === 'ROAD') {
-          // Determine road orientation
-          let orientation = 'BOTH' // Intersection
-          if (x % 3 === 0 && z % 3 !== 0) {
-            orientation = 'VERTICAL' // North-South road
-          } else if (x % 3 !== 0 && z % 3 === 0) {
-            orientation = 'HORIZONTAL' // East-West road
-          }
-          roadCells.push({ x, z, orientation })
-        }
-      }
+    if (!this.edgeSpawnPoints || this.edgeSpawnPoints.length === 0) {
+      console.error('No edge spawn points available')
+      return null
     }
     
-    if (roadCells.length === 0) return null
+    // Pick a random edge spawn point
+    const spawnPoint = this.edgeSpawnPoints[randomInt(0, this.edgeSpawnPoints.length - 1)]
     
-    // Try to find a valid spawn position (max 50 attempts)
-    for (let attempt = 0; attempt < 50; attempt++) {
-      // Pick random road cell
-      const cell = roadCells[randomInt(0, roadCells.length - 1)]
-      const worldX = (cell.x - grid.length / 2) * cellSize
-      const worldZ = (cell.z - grid[0].length / 2) * cellSize
-      
-      // Check if this position would overlap with buildings
-      if (this.isOverlappingBuilding(worldX, worldZ, 3)) {
-        continue // Try another position
-      }
-      
-      // Skip intersections - only spawn on straight roads
-      if (cell.orientation === 'BOTH') {
-        continue
-      }
-      
-      return this.createCarAtPosition(worldX, worldZ, cell.orientation)
+    // Convert grid coordinates to world coordinates
+    const worldX = (spawnPoint.cell.x - grid.length / 2) * cellSize
+    const worldZ = (spawnPoint.cell.z - grid[0].length / 2) * cellSize
+    
+    // Determine orientation based on entry direction
+    let orientation = 'BOTH' // Will be set more specifically
+    if (spawnPoint.entryDirection === DIRECTIONS.EAST || spawnPoint.entryDirection === DIRECTIONS.WEST) {
+      orientation = 'HORIZONTAL'
+    } else {
+      orientation = 'VERTICAL'
     }
     
-    return null // Failed to find valid position
+    return this.createCarAtPosition(worldX, worldZ, orientation, spawnPoint.entryDirection)
   }
 
   /**
    * Create a car at a specific world position with proper orientation
    */
-  createCarAtPosition(worldX, worldZ, orientation) {
+  createCarAtPosition(worldX, worldZ, orientation, entryDirection = null) {
     let rotation = ROTATIONS.NORTH
     let laneOffset = 0
     
@@ -150,20 +171,41 @@ export class SpawnManager {
     // Inner lane: 1.875, Outer lane: 5.625
     const offsetAmount = useOuterLane ? 5.625 : 1.875
     
+    // If entryDirection is provided (from edge spawn), use it directly
+    if (entryDirection !== null) {
+      switch (entryDirection) {
+        case DIRECTIONS.NORTH:
+          rotation = ROTATIONS.NORTH
+          laneOffset = offsetAmount // Right side of Northbound (-Z) is East (+X)
+          return new Car(new THREE.Vector3(worldX + laneOffset, 0, worldZ), rotation)
+        case DIRECTIONS.SOUTH:
+          rotation = ROTATIONS.SOUTH
+          laneOffset = -offsetAmount // Right side of Southbound (+Z) is West (-X)
+          return new Car(new THREE.Vector3(worldX + laneOffset, 0, worldZ), rotation)
+        case DIRECTIONS.EAST:
+          rotation = ROTATIONS.EAST
+          laneOffset = offsetAmount // Right side of Eastbound (+X) is South (+Z)
+          return new Car(new THREE.Vector3(worldX, 0, worldZ + laneOffset), rotation)
+        case DIRECTIONS.WEST:
+          rotation = ROTATIONS.WEST
+          laneOffset = -offsetAmount // Right side of Westbound (-X) is North (-Z)
+          return new Car(new THREE.Vector3(worldX, 0, worldZ + laneOffset), rotation)
+      }
+    }
+    
+    // Fallback to old logic (for backward compatibility, though may not be used)
     if (orientation === 'HORIZONTAL') {
       // East-West Road
       // US Driving Rule: Drive on the Right
       
       if (worldX > 0) {
         rotation = ROTATIONS.WEST // Traveling West (-X)
-        // Right side of Westbound (-X) is North (+Z).
-        // So we need Positive Z.
-        laneOffset = offsetAmount 
+        // Right side of Westbound (-X) is North (-Z).
+        laneOffset = -offsetAmount 
       } else {
         rotation = ROTATIONS.EAST // Traveling East (+X)
-        // Right side of Eastbound (+X) is South (-Z).
-        // So we need Negative Z.
-        laneOffset = -offsetAmount 
+        // Right side of Eastbound (+X) is South (+Z).
+        laneOffset = offsetAmount 
       }
       
       // Apply offset to Z (perpendicular to travel direction)
@@ -175,16 +217,12 @@ export class SpawnManager {
       
       if (worldZ > 0) {
         rotation = ROTATIONS.SOUTH // Traveling South (+Z)
-        // Right side of Southbound (+Z) is West (+X). Wait.
-        // Forward: (0,0,1). Up: (0,1,0). Right: Cross(Up, Fwd) = (1,0,0) = +X.
-        // So we need Positive X.
-        laneOffset = offsetAmount 
+        // Right side of Southbound (+Z) is West (-X).
+        laneOffset = -offsetAmount 
       } else {
         rotation = ROTATIONS.NORTH // Traveling North (-Z)
-        // Right side of Northbound (-Z) is East (-X). Wait.
-        // Forward: (0,0,-1). Up: (0,1,0). Right: Cross(Up, Fwd) = (-1,0,0) = -X.
-        // So we need Negative X.
-        laneOffset = -offsetAmount 
+        // Right side of Northbound (-Z) is East (+X).
+        laneOffset = offsetAmount 
       }
       
       // Apply offset to X (perpendicular to travel direction)
@@ -192,6 +230,76 @@ export class SpawnManager {
     }
     
     return null
+  }
+
+
+  /**
+   * Check if a grid cell is at the edge of the map (boundary intersection)
+   */
+  isEdgeIntersection(cell, grid) {
+    // Check if it's an intersection first
+    if (cell.x % 3 !== 0 || cell.z % 3 !== 0) {
+      return false
+    }
+    
+    // Check if it's on any boundary
+    return cell.x === 0 || cell.x === grid.length - 1 || 
+           cell.z === 0 || cell.z === grid[0].length - 1
+  }
+
+  /**
+   * Find all valid spawn points at map edges
+   */
+  findEdgeSpawnPoints(grid) {
+    const edgePoints = []
+    
+    // Max grid coordinates (grid is 0-indexed)
+    const maxX = grid.length - 1
+    const maxZ = grid[0].length - 1
+    
+    console.log(`Grid dimensions: ${grid.length} x ${grid[0].length}, max coords: (${maxX}, ${maxZ})`)
+    
+    // Find all intersections on the edges
+    for (let x = 0; x < grid.length; x += 3) {
+      for (let z = 0; z < grid[x].length; z += 3) {
+        const cell = { x, z }
+        if (this.isEdgeIntersection(cell, grid)) {
+          // Determine which edge(s) this is on and the entry direction
+          // Entry direction should point INTO the city (inward)
+          const directions = []
+          
+          // West edge (x=0): cars enter going EAST (into city)
+          if (x === 0) {
+            directions.push({ edge: 'WEST', direction: DIRECTIONS.EAST })
+          }
+          // East edge (x=max): cars enter going WEST (into city)
+          if (x === maxX) {
+            directions.push({ edge: 'EAST', direction: DIRECTIONS.WEST })
+          }
+          // North edge (z=0): cars enter going SOUTH (into city)
+          if (z === 0) {
+            directions.push({ edge: 'NORTH', direction: DIRECTIONS.SOUTH })
+          }
+          // South edge (z=max): cars enter going NORTH (into city)
+          if (z === maxZ) {
+            directions.push({ edge: 'SOUTH', direction: DIRECTIONS.NORTH })
+          }
+          
+          // For corner intersections, pick one direction (prefer horizontal entry)
+          const entryDirection = directions[0].direction
+          
+          console.log(`Edge spawn at (${x}, ${z}) on ${directions[0].edge} edge, entering ${entryDirection}`)
+          
+          edgePoints.push({
+            cell,
+            entryDirection,
+            edge: directions[0].edge
+          })
+        }
+      }
+    }
+    
+    return edgePoints
   }
 
   /**
@@ -434,14 +542,15 @@ export class SpawnManager {
             if (carDir === DIRECTIONS.NORTH || carDir === DIRECTIONS.SOUTH) {
                 // Moving Z. Offset is X.
                 // We need to know the SIGN of the offset.
-                // In createCarAtPosition:
-                // South: +X. North: -X.
-                const sign = carDir === DIRECTIONS.SOUTH ? 1 : -1
+                // North (-Z): Right is +X. Sign +1.
+                // South (+Z): Right is -X. Sign -1.
+                const sign = carDir === DIRECTIONS.NORTH ? 1 : -1
                 car.position.x = ((startNode.x - grid.length/2) * cellSize) + (sign * desiredOffset)
             } else { // EAST or WEST
                 // Moving X. Offset is Z.
-                // West: +Z. East: -Z.
-                const sign = carDir === DIRECTIONS.WEST ? 1 : -1
+                // East (+X): Right is +Z. Sign +1.
+                // West (-X): Right is -Z. Sign -1.
+                const sign = carDir === DIRECTIONS.EAST ? 1 : -1
                 car.position.z = ((startNode.z - grid[0].length/2) * cellSize) + (sign * desiredOffset)
             }
         }
