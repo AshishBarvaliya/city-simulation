@@ -338,7 +338,62 @@ export class Car extends BaseEntity {
     }
     
     // Compare current direction with next direction
-    return this.getTurnDirection(this.direction, nextDir)
+    const turnDir = this.getTurnDirection(this.direction, nextDir)
+    console.log(`[Car] getNextTurnDirection: CurrentDir=${this.direction}, NextDir=${nextDir} (from ${nextNode.x},${nextNode.z}), Turn=${turnDir}`)
+    return turnDir
+  }
+
+  /**
+   * Get a list of future turns based on the current path
+   */
+  getFuturePathDetails() {
+    if (!this.targetNode || !this.path) return []
+
+    const turns = []
+    let currentDir = this.direction
+    let currentNode = this.targetNode
+    
+    // Check turn at targetNode (moving to path[0])
+    if (this.path.length > 0) {
+      const nextNode = this.path[0]
+      const dx = nextNode.x - currentNode.x
+      const dz = nextNode.z - currentNode.z
+      
+      let nextDir = null
+      if (Math.abs(dx) > Math.abs(dz)) {
+        nextDir = dx > 0 ? DIRECTIONS.EAST : DIRECTIONS.WEST
+      } else {
+        nextDir = dz > 0 ? DIRECTIONS.SOUTH : DIRECTIONS.NORTH
+      }
+      
+      const turn = this.getTurnDirection(currentDir, nextDir)
+      turns.push(turn)
+      
+      currentDir = nextDir
+      currentNode = nextNode
+    }
+    
+    // Check subsequent turns
+    for (let i = 0; i < this.path.length - 1; i++) {
+      const nextNode = this.path[i+1]
+      const dx = nextNode.x - currentNode.x
+      const dz = nextNode.z - currentNode.z
+      
+      let nextDir = null
+      if (Math.abs(dx) > Math.abs(dz)) {
+        nextDir = dx > 0 ? DIRECTIONS.EAST : DIRECTIONS.WEST
+      } else {
+        nextDir = dz > 0 ? DIRECTIONS.SOUTH : DIRECTIONS.NORTH
+      }
+      
+      const turn = this.getTurnDirection(currentDir, nextDir)
+      turns.push(turn)
+      
+      currentDir = nextDir
+      currentNode = nextNode
+    }
+    
+    return turns
   }
 
   setPath(path) {
@@ -382,6 +437,7 @@ export class Car extends BaseEntity {
         if (currentDir !== nextDir) {
           this.initiateTurn(nextDir, nextNode)
         } else {
+          console.log(`[Car] Continuing straight to (${nextNode.x}, ${nextNode.z})`)
           this.targetNode = nextNode
         }
       } else {
@@ -406,6 +462,7 @@ export class Car extends BaseEntity {
   }
 
   initiateTurn(newDirection, nextNode) {
+    console.log(`[Car] initiateTurn: NewDir=${newDirection}, TargetNode=(${nextNode.x}, ${nextNode.z})`)
     this.isTurning = true
     this.turnProgress = 0
     this.startRotation = this.rotation.y

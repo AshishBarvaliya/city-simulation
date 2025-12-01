@@ -64,4 +64,44 @@ export class UIManager {
       this.arrows.STRAIGHT.style.transform = 'scale(1.2)'
     }
   }
+
+  setPath(pathDetails) {
+    // Create path container if it doesn't exist
+    if (!this.pathContainer) {
+      this.pathContainer = document.createElement('div')
+      this.pathContainer.style.position = 'absolute'
+      this.pathContainer.style.top = '100px'
+      this.pathContainer.style.left = '50%'
+      this.pathContainer.style.transform = 'translateX(-50%)'
+      this.pathContainer.style.display = 'flex'
+      this.pathContainer.style.flexDirection = 'column'
+      this.pathContainer.style.gap = '5px'
+      this.pathContainer.style.pointerEvents = 'none'
+      document.body.appendChild(this.pathContainer)
+    }
+
+    // Clear existing
+    this.pathContainer.innerHTML = ''
+    this.pathContainer.style.display = this.overlay.style.display
+
+    // Add new items
+    pathDetails.forEach((turn, index) => {
+      const el = document.createElement('div')
+      el.textContent = `${index + 1}. ${turn}`
+      el.style.color = 'white'
+      el.style.fontSize = '16px'
+      el.style.textShadow = '0 1px 2px black'
+      el.style.backgroundColor = 'rgba(0,0,0,0.5)'
+      el.style.padding = '2px 8px'
+      el.style.borderRadius = '4px'
+      
+      // Highlight the immediate next turn
+      if (index === 0) {
+        el.style.color = '#ffff00'
+        el.style.fontWeight = 'bold'
+      }
+      
+      this.pathContainer.appendChild(el)
+    })
+  }
 }

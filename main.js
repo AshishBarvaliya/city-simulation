@@ -86,6 +86,20 @@ function animate() {
 
   city.update(delta, time)
   
+  city.update(delta, time)
+  
+  // Auto-select car if none selected
+  if (!selectedCar || !selectedCar.active) {
+    const cars = city.entityManager.getByType('CAR')
+    const activeCars = cars.filter(c => c.active)
+    if (activeCars.length > 0) {
+      selectedCar = activeCars[0]
+      isFollowMode = true
+      controls.enabled = false
+      console.log('Auto-following car:', selectedCar)
+    }
+  }
+
   // Update camera if in follow mode
   if (isFollowMode && selectedCar && selectedCar.active) {
     updateFollowCamera()
@@ -94,6 +108,9 @@ function animate() {
     uiManager.show()
     const nextTurn = selectedCar.getNextTurnDirection()
     uiManager.setDirection(nextTurn)
+    
+    const pathDetails = selectedCar.getFuturePathDetails()
+    uiManager.setPath(pathDetails)
   } else {
     controls.update()
     uiManager.hide()
